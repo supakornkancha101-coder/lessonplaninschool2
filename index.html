@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta name="robots" content="noindex, nofollow">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ระบบรายงานผลการปฏิบัติงาน EDU 01</title>
+  
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#FF8FAB" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="EDU Report">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3145/3145827.png">
+
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- โหลด React และ Babel -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- โหลด Firebase SDK (เวอร์ชัน 8 Compat สำหรับใช้งานผ่าน CDN ได้ง่าย) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    // ==========================================
+    // 🔴 ส่วนที่ต้องแก้ไข: ใส่การตั้งค่า Firebase ของคุณที่นี่
+    // ==========================================
+    const firebaseConfig = {
+  apiKey: "AIzaSyBJB6K-3A3_4Xmi8uqw3iqpWL-Bn5H348A",
+  authDomain: "lessonplansuki.firebaseapp.com",
+  databaseURL: "https://lessonplansuki-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "lessonplansuki",
+  storageBucket: "lessonplansuki.firebasestorage.app",
+  messagingSenderId: "382229496197",
+  appId: "1:382229496197:web:4b9a40c2b3efafea5104ec",
+  measurementId: "G-3E4BXVS8B4"
+};
+    
+    // เริ่มต้นเชื่อมต่อ Firebase
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.database();
+    // ==========================================
+
+    const MIN_TOTAL = 180, MIN_EACH = 90;
+
+    const P = {
+      pink:"#FF8FAB", pinkL:"#FFD6E0", pinkS:"#FFF0F5",
+      teal:"#4ECDC4", tealL:"#C2F0ED", tealS:"#E8FFFE",
+      yellow:"#FFD93D", yellowL:"#FFF3B0",
+      purple:"#C77DFF", purpleL:"#ECC8FF", purpleS:"#F8F0FF",
+      bg:"#FFF8FC", text:"#3D2B3D", muted:"#9B7FA3", border:"#F0DCE8",
+    };
+
+    const css = `
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0}
+    body,#root{background:${P.bg};font-family:'Nunito',sans-serif;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+    .app{color:${P.text};min-height:100vh;padding:1rem;max-width:980px;margin:0 auto;padding-bottom:env(safe-area-inset-bottom);}
+    .card{background:#fff;border-radius:20px;border:2px solid ${P.border};padding:20px}
+    .btnP{background:linear-gradient(135deg,${P.pink},${P.purple});color:#fff;border:none;border-radius:50px;padding:10px 22px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 14px ${P.pinkL}}
+    .btnP:hover{transform:translateY(-2px);box-shadow:0 8px 22px ${P.pinkL}}
+    .btnP:active{transform:scale(.97)}
+    .btnG{background:transparent;border:2px solid ${P.border};border-radius:50px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:700;font-size:13px;color:${P.muted};cursor:pointer;transition:all .15s}
+    .btnG:hover{border-color:${P.pink};color:${P.pink}}
+    .blob{position:absolute;border-radius:50%;filter:blur(50px);opacity:.3;pointer-events:none}
+    @keyframes pop{0%{transform:scale(.88);opacity:0}100%{transform:scale(1);opacity:1}}
+    .pop{animation:pop .3s cubic-bezier(.34,1.56,.64,1) forwards}
+    @keyframes sd{0%{transform:translateY(-8px);opacity:0}100%{transform:translateY(0);opacity:1}}
+    .sd{animation:sd .22s ease forwards}
+    @keyframes shUp{0%{transform:translateY(100%);opacity:0}100%{transform:translateY(0);opacity:1}}
+    .sheet{animation:shUp .28s cubic-bezier(.34,1.2,.64,1) forwards}
+    @keyframes fadeIn{0%{opacity:0}100%{opacity:1}}
+    .fadeIn{animation:fadeIn .2s ease forwards}
+    tr.row:hover td{background:${P.pinkS}}
+    .pw{background:${P.pinkL};border-radius:999px;height:10px;overflow:hidden}
+    .pb{height:100%;border-radius:999px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+    .tagT{background:${P.tealL};color:#0A6E68;font-size:11px;padding:3px 10px;border-radius:50px;font-weight:800;white-space:nowrap;display:inline-block}
+    .tagO{background:${P.yellowL};color:#8A6400;font-size:11px;padding:3px 10px;border-radius:50px;font-weight:800;white-space:nowrap;display:inline-block}
+    .fl{font-size:11px;font-weight:800;color:${P.muted};margin-bottom:5px;letter-spacing:.3px}
+    .drumWrap{position:relative;height:220px;overflow:hidden;cursor:grab}
+    .drumWrap:active{cursor:grabbing}
+    .drumList{position:absolute;top:0;left:0;right:0;will-change:transform}
+    .drumItem{height:44px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;font-family:'Nunito',sans-serif;color:${P.muted};user-select:none;-webkit-user-select:none;overflow:hidden}
+    .drumItem.on{font-size:28px;font-weight:900;color:${P.pink}}
+    .drumFT{position:absolute;top:0;left:0;right:0;height:88px;background:linear-gradient(to bottom,#fff 30%,transparent);pointer-events:none;z-index:2}
+    .drumFB{position:absolute;bottom:0;left:0;right:0;height:88px;background:linear-gradient(to top,#fff 30%,transparent);pointer-events:none;z-index:2}
+    .drumLine{position:absolute;top:88px;left:8px;right:8px;height:44px;border-top:2px solid ${P.pinkL};border-bottom:2px solid ${P.pinkL};border-radius:12px;pointer-events:none;z-index:1;background:${P.pinkS}}
+    .overlay{position:fixed;inset:0;background:rgba(61,43,61,.45);z-index:100;display:flex;align-items:flex-end;justify-content:center}
+    .bsheet{background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:520px;padding:0 0 env(safe-area-inset-bottom)}
+    .handle{width:44px;height:5px;background:${P.border};border-radius:999px;margin:12px auto 4px}
+    .tslider{-webkit-appearance:none;appearance:none;width:100%;height:10px;border-radius:999px;outline:none;cursor:pointer}
+    .tslider::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:${P.teal};border:3px solid #fff;box-shadow:0 2px 8px ${P.tealL};cursor:pointer}
+    `;
+
+    const pad     = n => String(n).padStart(2, "0");
+    const fromStr = s => { if (!s) return [0, 0]; const [hh, mm] = s.split(":").map(Number); return [hh || 0, mm || 0]; };
+    const toStr   = (hh, mm) => `${pad(hh)}:${pad(mm)}`;
+    const diffH   = (s, e) => { const [sh, sm] = fromStr(s); const [eh, em] = fromStr(e); const d = (eh * 60 + em) - (sh * 60 + sm); return d > 0 ? +(d / 60).toFixed(2) : 0; };
+    const fmtDate = d => { try { return new Date(d + "T12:00").toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" }); } catch { return d; } };
+    const MONTHS  = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+
+    // --- UI Components ---
+    function PwField({ value, onChange, placeholder, onEnter, extraStyle }) {
+      const [show, setShow] = useState(false);
+      const base = { fontFamily: "Nunito,sans-serif", border: `2px solid ${P.border}`, borderRadius: 12, padding: "9px 44px 9px 12px", fontSize: 14, background: P.pinkS, color: P.text, width: "100%", outline: "none" };
+      return (
+        <div style={{ position: "relative" }}>
+          <input type={show ? "text" : "password"} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} onKeyDown={e => e.key === "Enter" && onEnter && onEnter()} style={{ ...base, ...extraStyle }} />
+          <button type="button" onClick={() => setShow(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 18, padding: "4px", color: P.muted, lineHeight: 1 }}>{show ? "🙈" : "👁️"}</button>
+        </div>
+      );
+    }
+
+    function DrumCol({ items, value, onChange, width }) {
+      const ITEM_H = 44, CENTER = 2, listRef = useRef(null), drag = useRef(false), startY = useRef(0), startT = useRef(0), velY = useRef(0), lastY = useRef(0), topRef = useRef(0), animRef = useRef(null);
+      const snapTo = useCallback((idx, animate) => {
+        const i = Math.max(0, Math.min(items.length - 1, idx));
+        const target = -(i * ITEM_H) + CENTER * ITEM_H;
+        if (!animate) { topRef.current = target; if (listRef.current) listRef.current.style.transform = `translateY(${target}px)`; return; }
+        const start = topRef.current, dist = target - start, dur = 260, t0 = performance.now(), ease = t => 1 - Math.pow(1 - t, 3);
+        const step = now => {
+          const prog = Math.min((now - t0) / dur, 1), cur = start + dist * ease(prog);
+          topRef.current = cur; if (listRef.current) listRef.current.style.transform = `translateY(${cur}px)`;
+          if (prog < 1) { animRef.current = requestAnimationFrame(step); } else { onChange(items[i].val); }
+        };
+        if (animRef.current) cancelAnimationFrame(animRef.current); animRef.current = requestAnimationFrame(step);
+      }, [items, onChange]);
+
+      const curIdx = () => Math.round(Math.max(0, Math.min(items.length - 1, -(topRef.current - CENTER * ITEM_H) / ITEM_H)));
+      useEffect(() => { const i = items.findIndex(x => String(x.val) === String(value)); snapTo(i >= 0 ? i : 0, false); }, []); 
+      useEffect(() => { const i = items.findIndex(x => String(x.val) === String(value)); if (i >= 0) snapTo(i, false); }, [value]); 
+      const hilight = i => { if (!listRef.current) return; [...listRef.current.children].forEach((c, j) => c.classList.toggle("on", j === i)); };
+      const onDown = e => { e.currentTarget.setPointerCapture(e.pointerId); drag.current = true; startY.current = e.clientY; startT.current = topRef.current; lastY.current = e.clientY; velY.current = 0; if (animRef.current) cancelAnimationFrame(animRef.current); };
+      const onMove = e => { if (!drag.current) return; velY.current = e.clientY - lastY.current; lastY.current = e.clientY; const next = startT.current + (e.clientY - startY.current); topRef.current = next; if (listRef.current) listRef.current.style.transform = `translateY(${next}px)`; hilight(curIdx()); };
+      const onUp = () => { if (!drag.current) return; drag.current = false; const target = topRef.current + velY.current * 8; const snapped = Math.round(Math.max(0, Math.min(items.length - 1, -(target - CENTER * ITEM_H) / ITEM_H))); snapTo(snapped, true); setTimeout(() => hilight(snapped), 280); };
+      const visIdx = items.findIndex(x => String(x.val) === String(value));
+
+      return (
+        <div style={{ width, position: "relative", userSelect: "none" }}>
+          <div className="drumWrap" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+            <div className="drumLine" /><div className="drumFT" /><div className="drumFB" />
+            <div ref={listRef} className="drumList">
+              {items.map((item, i) => (<div key={item.val} className={`drumItem${i === visIdx ? " on" : ""}`} onClick={() => snapTo(i, true)}>{item.label}</div>))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function TimePicker({ value, onDone, onClose, label }) {
+      const [hh, mm] = fromStr(value || "08:00");
+      const [curH, setCurH] = useState(hh), [curM, setCurM] = useState(mm), [typH, setTypH] = useState(String(hh)), [typM, setTypM] = useState(pad(mm)), [mode, setMode] = useState("drum");
+      const hours = Array.from({ length: 24 }, (_, i) => ({ val: i, label: pad(i) })), minutes = Array.from({ length: 12 }, (_, i) => ({ val: i * 5, label: pad(i * 5) })), drumM = Math.round(curM / 5) * 5 % 60;
+      const onTypH = v => { setTypH(v); const n = parseInt(v); if (!isNaN(n) && n >= 0 && n <= 23) setCurH(n); };
+      const onTypM = v => { setTypM(v); const n = parseInt(v); if (!isNaN(n) && n >= 0 && n <= 59) setCurM(n); };
+
+      return (
+        <div className="overlay fadeIn" onClick={onClose}>
+          <div className="bsheet sheet" onClick={e => e.stopPropagation()}>
+            <div className="handle" />
+            <div style={{ padding: "0 20px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 15, fontWeight: 900, color: P.text }}>⏰ {label}</div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button onClick={() => setMode(prev => prev === "drum" ? "type" : "drum")} style={{ fontSize: 12, background: P.purpleS, border: `2px solid ${P.purpleL}`, borderRadius: 50, padding: "5px 14px", cursor: "pointer", fontWeight: 800, fontFamily: "Nunito,sans-serif", color: P.purple }}>{mode === "drum" ? "⌨️ พิมพ์" : "🥁 หมุน"}</button>
+                <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: P.muted, fontFamily: "Nunito,sans-serif" }}>×</button>
+              </div>
+            </div>
+            <div style={{ textAlign: "center", padding: "4px 0 8px" }}>
+              <span style={{ fontSize: 42, fontWeight: 900, letterSpacing: 2, background: `linear-gradient(135deg,${P.pink},${P.purple})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{pad(curH)}:{pad(curM)}</span>
+              <div style={{ fontSize: 11, color: P.muted, fontWeight: 700, marginTop: 2 }}>ระบบ 24 ชั่วโมง</div>
+            </div>
+            {mode === "drum" ? (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: "0 20px" }}>
+                <DrumCol items={hours} value={curH} onChange={setCurH} width={110} />
+                <div style={{ fontSize: 32, fontWeight: 900, color: P.pink, paddingBottom: 8 }}>:</div>
+                <DrumCol items={minutes} value={drumM} onChange={v => setCurM(v)} width={110} />
+              </div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, padding: "16px 24px" }}>
+                <div style={{ textAlign: "center" }}><div className="fl" style={{ marginBottom: 8 }}>ชั่วโมง (0–23)</div><input type="number" min={0} max={23} value={typH} onChange={e => onTypH(e.target.value)} style={{ width: 90, textAlign: "center", fontSize: 32, fontWeight: 900, border: `2px solid ${P.pinkL}`, borderRadius: 14, padding: "10px 6px", fontFamily: "Nunito,sans-serif", color: P.text, background: P.pinkS, outline: "none" }} /></div>
+                <div style={{ fontSize: 36, fontWeight: 900, color: P.pink, marginTop: 20 }}>:</div>
+                <div style={{ textAlign: "center" }}><div className="fl" style={{ marginBottom: 8 }}>นาที (0–59)</div><input type="number" min={0} max={59} value={typM} onChange={e => onTypM(e.target.value)} style={{ width: 90, textAlign: "center", fontSize: 32, fontWeight: 900, border: `2px solid ${P.pinkL}`, borderRadius: 14, padding: "10px 6px", fontFamily: "Nunito,sans-serif", color: P.text, background: P.pinkS, outline: "none" }} /></div>
+              </div>
+            )}
+            <div style={{ padding: "12px 20px 20px", display: "flex", gap: 10 }}>
+              <button className="btnP" onClick={() => onDone(toStr(curH, curM))} style={{ flex: 1, justifyContent: "center", fontSize: 15 }}>✅ ยืนยัน</button><button className="btnG" onClick={onClose}>ยกเลิก</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function DatePicker({ value, onDone, onClose }) {
+      const now = new Date(), initD = value ? new Date(value + "T12:00") : now;
+      const [yr, setYr] = useState(initD.getFullYear()), [mo, setMo] = useState(initD.getMonth()), [dy, setDy] = useState(initD.getDate()), [mode, setMode] = useState("cal"), [typY, setTypY] = useState(String(initD.getFullYear())), [typM, setTypM] = useState(String(initD.getMonth() + 1)), [typD, setTypD] = useState(String(initD.getDate()));
+      const dim = new Date(yr, mo + 1, 0).getDate(), days = Array.from({ length: dim }, (_, i) => ({ val: i + 1, label: String(i + 1) })), mons = MONTHS.map((l, i) => ({ val: i, label: l })), years = Array.from({ length: 10 }, (_, i) => ({ val: now.getFullYear() - 2 + i, label: String(now.getFullYear() - 2 + i) }));
+      const confirm = () => onDone(`${yr}-${pad(mo + 1)}-${pad(Math.min(dy, dim))}`);
+      const firstDow = new Date(yr, mo, 1).getDay(); const calCells = []; for (let i = 0; i < firstDow; i++) calCells.push(null); for (let i = 1; i <= dim; i++) calCells.push(i);
+      const isToday = d => d && d === now.getDate() && mo === now.getMonth() && yr === now.getFullYear();
+      const prevMo = () => { if (mo === 0) { setMo(11); setYr(y => y - 1); } else { setMo(m => m - 1); } }, nextMo = () => { if (mo === 11) { setMo(0); setYr(y => y + 1); } else { setMo(m => m + 1); } };
+
+      return (
+        <div className="overlay fadeIn" onClick={onClose}>
+          <div className="bsheet sheet" onClick={e => e.stopPropagation()}>
+            <div className="handle" />
+            <div style={{ padding: "0 20px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 15, fontWeight: 900, color: P.text }}>📅 เลือกวันที่</div>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                {["cal", "drum", "type"].map(mv => (<button key={mv} onClick={() => setMode(mv)} style={{ fontSize: 12, background: mode === mv ? P.pink : P.pinkS, border: `2px solid ${mode === mv ? P.pink : P.border}`, borderRadius: 50, padding: "4px 12px", cursor: "pointer", fontWeight: 800, fontFamily: "Nunito,sans-serif", color: mode === mv ? "#fff" : P.muted, transition: "all .15s" }}>{mv === "cal" ? "📆" : mv === "drum" ? "🥁" : "⌨️"}</button>))}
+                <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: P.muted, fontFamily: "Nunito,sans-serif" }}>×</button>
+              </div>
+            </div>
+            <div style={{ textAlign: "center", padding: "2px 0 8px" }}><span style={{ fontSize: 20, fontWeight: 900, color: P.pink }}>{dy} {MONTHS[mo]} {yr}</span></div>
+
+            {mode === "cal" && (
+              <div style={{ padding: "0 16px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}><button onClick={prevMo} style={{ background: P.pinkS, border: `2px solid ${P.border}`, borderRadius: 12, padding: "6px 14px", cursor: "pointer", fontWeight: 900, fontFamily: "Nunito,sans-serif", fontSize: 16, color: P.pink }}>‹</button><div style={{ fontWeight: 900, fontSize: 15 }}>{MONTHS[mo]} {yr}</div><button onClick={nextMo} style={{ background: P.pinkS, border: `2px solid ${P.border}`, borderRadius: 12, padding: "6px 14px", cursor: "pointer", fontWeight: 900, fontFamily: "Nunito,sans-serif", fontSize: 16, color: P.pink }}>›</button></div>
+                <div style={{ display: "flex", gap: 6, marginBottom: 10, overflowX: "auto", paddingBottom: 4 }}>{years.map(y => (<button key={y.val} onClick={() => setYr(y.val)} style={{ flexShrink: 0, fontSize: 12, padding: "4px 12px", borderRadius: 50, border: "2px solid", cursor: "pointer", fontFamily: "Nunito,sans-serif", fontWeight: 800, borderColor: yr === y.val ? P.pink : P.border, background: yr === y.val ? P.pink : "#fff", color: yr === y.val ? "#fff" : P.muted }}>{y.val}</button>))}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3, marginBottom: 8 }}>
+                  {["อา","จ","อ","พ","พฤ","ศ","ส"].map(d => (<div key={d} style={{ textAlign: "center", fontSize: 10, fontWeight: 800, color: P.muted, padding: "3px 0" }}>{d}</div>))}
+                  {calCells.map((d, i) => (<button key={i} onClick={() => d && setDy(d)} disabled={!d} style={{ aspectRatio: "1", border: "none", borderRadius: 10, cursor: d ? "pointer" : "default", fontFamily: "Nunito,sans-serif", fontWeight: d === dy ? 900 : 700, fontSize: 13, background: d === dy ? P.pink : isToday(d) ? P.pinkL : "transparent", color: d === dy ? "#fff" : isToday(d) ? P.pink : d ? P.text : "transparent" }}>{d || ""}</button>))}
+                </div>
+              </div>
+            )}
+
+            {mode === "drum" && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: "0 12px" }}>
+                <div style={{ textAlign: "center" }}><div className="fl" style={{ textAlign: "center", marginBottom: 4 }}>วัน</div><DrumCol items={days} value={dy} onChange={setDy} width={70} /></div>
+                <div style={{ textAlign: "center" }}><div className="fl" style={{ textAlign: "center", marginBottom: 4 }}>เดือน</div><DrumCol items={mons} value={mo} onChange={setMo} width={80} /></div>
+                <div style={{ textAlign: "center" }}><div className="fl" style={{ textAlign: "center", marginBottom: 4 }}>ปี</div><DrumCol items={years} value={yr} onChange={setYr} width={90} /></div>
+              </div>
+            )}
+
+            {mode === "type" && (
+              <div style={{ display: "flex", gap: 10, padding: "8px 24px 4px", alignItems: "flex-end" }}>
+                {[{ label: "วันที่", val: typD, set: v => { setTypD(v); const n = parseInt(v); if (!isNaN(n) && n >= 1 && n <= 31) setDy(n); } }, { label: "เดือน (1-12)", val: typM, set: v => { setTypM(v); const n = parseInt(v); if (!isNaN(n) && n >= 1 && n <= 12) setMo(n - 1); } }, { label: "ปี", val: typY, set: v => { setTypY(v); const n = parseInt(v); if (!isNaN(n) && n >= 2000 && n <= 2100) setYr(n); } }].map(({ label, val, set }) => (
+                  <div key={label} style={{ flex: 1 }}><div className="fl">{label}</div><input type="number" value={val} onChange={e => set(e.target.value)} style={{ width: "100%", textAlign: "center", fontSize: 20, fontWeight: 900, border: `2px solid ${P.pinkL}`, borderRadius: 14, padding: "8px 4px", fontFamily: "Nunito,sans-serif", color: P.text, background: P.pinkS, outline: "none" }} /></div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "10px 20px 20px" }}>
+              <button onClick={() => { const t = new Date(); setYr(t.getFullYear()); setMo(t.getMonth()); setDy(t.getDate()); }} style={{ fontSize: 12, background: P.tealS, border: `2px solid ${P.tealL}`, borderRadius: 50, padding: "7px 16px", cursor: "pointer", fontWeight: 800, fontFamily: "Nunito,sans-serif", color: "#0A6E68" }}>📍 วันนี้</button>
+              <button className="btnP" onClick={confirm} style={{ flex: 1, justifyContent: "center", fontSize: 15 }}>✅ ยืนยัน</button><button className="btnG" onClick={onClose}>ยกเลิก</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function PickerBtn({ label, display, onClick, icon }) {
+      return (
+        <div>
+          <div className="fl">{icon} {label}</div>
+          <button onClick={onClick} style={{ width: "100%", background: "#fff", border: `2px solid ${P.border}`, borderRadius: 14, padding: "11px 14px", fontFamily: "Nunito,sans-serif", fontWeight: 800, fontSize: 15, color: display ? P.text : P.muted, cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>{display || "แตะเพื่อเลือก"}</span><span style={{ color: P.pink, fontSize: 18 }}>›</span>
+          </button>
+        </div>
+      );
+    }
+
+    function SmartSplit({ totalHours, teachHours, onChange }) {
+      const othH = +(totalHours - teachHours).toFixed(2), pct = totalHours > 0 ? (teachHours / totalHours) * 100 : 0, clamp = v => Math.min(totalHours, Math.max(0, +v.toFixed(2)));
+      return (
+        <div style={{ background: P.purpleS, border: `2px dashed ${P.purpleL}`, borderRadius: 18, padding: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: P.purple, marginBottom: 12 }}>🗂️ แบ่งประเภทงาน</div>
+          <div style={{ borderRadius: 12, overflow: "hidden", height: 28, display: "flex", marginBottom: 12, border: `2px solid ${P.border}` }}>
+            <div style={{ width: `${pct}%`, background: `linear-gradient(90deg,${P.teal},${P.tealL})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, color: "#0A6E68", overflow: "hidden", whiteSpace: "nowrap", padding: "0 6px", minWidth: pct > 5 ? "auto" : 0, transition: "width .3s" }}>{pct > 15 ? `📚 ${teachHours.toFixed(1)}ชม.` : ""}</div>
+            <div style={{ flex: 1, background: `linear-gradient(90deg,${P.yellowL},${P.yellow}55)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, color: "#8A6400", overflow: "hidden", whiteSpace: "nowrap", padding: "0 6px" }}>{(100 - pct) > 15 ? `📋 ${othH.toFixed(1)}ชม.` : ""}</div>
+          </div>
+          <div className="fl">📚 การปฏิบัติการสอน</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <button onClick={() => onChange(clamp(+(teachHours - 0.5).toFixed(2)))} style={{ width: 40, height: 40, borderRadius: 12, border: `2px solid ${P.tealL}`, background: P.tealL, cursor: "pointer", fontSize: 22, fontWeight: 900, color: "#0A6E68", fontFamily: "Nunito,sans-serif", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+            <div style={{ flex: 1, background: "#fff", border: `2px solid ${P.tealL}`, borderRadius: 14, padding: 10, textAlign: "center", fontWeight: 900, fontSize: 20, color: "#0A6E68" }}>{teachHours.toFixed(1)}<span style={{ fontSize: 12, fontWeight: 700, color: P.muted }}> ชม.</span></div>
+            <button onClick={() => onChange(clamp(+(teachHours + 0.5).toFixed(2)))} style={{ width: 40, height: 40, borderRadius: 12, border: `2px solid ${P.tealL}`, background: P.tealL, cursor: "pointer", fontSize: 22, fontWeight: 900, color: "#0A6E68", fontFamily: "Nunito,sans-serif", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+          </div>
+          <input type="range" className="tslider" min={0} max={totalHours} step={0.5} value={teachHours} onChange={e => onChange(clamp(parseFloat(e.target.value)))} style={{ background: `linear-gradient(90deg,${P.teal} ${pct}%,${P.pinkL} ${pct}%)` }} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: P.muted, fontWeight: 700, marginTop: 2 }}><span>0</span><span>{totalHours.toFixed(1)} ชม.</span></div>
+          <div style={{ background: "#fff", border: `2px solid ${P.yellowL}`, borderRadius: 14, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}><span style={{ fontSize: 13, fontWeight: 800, color: "#8A6400" }}>📋 งานอื่นๆ (คำนวณอัตโนมัติ)</span><span style={{ fontSize: 18, fontWeight: 900, color: "#8A6400" }}>{othH.toFixed(1)} <span style={{ fontSize: 12 }}>ชม.</span></span></div>
+          {othH < 0 && <div style={{ fontSize: 12, color: "#E05370", fontWeight: 800, marginTop: 6 }}>⚠️ ชั่วโมงสอนเกินกว่าเวลารวม!</div>}
+        </div>
+      );
+    }
+
+    function StatCard({ emoji, label, val, target, color, colorL }) {
+      const pct = Math.min((val / target) * 100, 100), done = val >= target;
+      return (
+        <div className="card pop" style={{ position: "relative", overflow: "hidden", border: `2px solid ${done ? color + "66" : P.border}` }}>
+          <div className="blob" style={{ width: 110, height: 110, background: colorL, top: -30, right: -30 }} />
+          <div style={{ fontSize: 28, marginBottom: 4 }}>{emoji}</div><div style={{ fontSize: 11, color: P.muted, fontWeight: 700, marginBottom: 2 }}>{label}</div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: done ? color : P.text, lineHeight: 1.1 }}>{val.toFixed(1)}<span style={{ fontSize: 12, color: P.muted, fontWeight: 600 }}>/{target} ชม.</span></div>
+          <div style={{ fontSize: 11, color: done ? color : P.muted, fontWeight: 800, margin: "5px 0 10px" }}>{done ? "✅ ครบแล้ว!" : "ต้องการอีก " + Math.max(0, target - val).toFixed(1) + " ชม."}</div>
+          <div className="pw"><div className="pb" style={{ width: `${pct}%`, background: `linear-gradient(90deg,${color},${colorL})` }} /></div>
+        </div>
+      );
+    }
+
+    const EMPTY_ROW = { date: "", startTime: "08:00", endTime: "16:00", teachHours: 0, note: "" };
+
+    function RecordForm({ initial, onSave, onCancel, title, bgColor }) {
+      const [row, setRow] = useState(initial), [showSt, setShowSt] = useState(false), [showEt, setShowEt] = useState(false), [showDt, setShowDt] = useState(false);
+      const upd = patch => setRow(r => ({ ...r, ...patch }));
+      const totalH = diffH(row.startTime, row.endTime), teachH = Math.min(row.teachHours || 0, Math.max(0, totalH));
+
+      const handleSave = () => {
+        if (!row.date) return alert("กรุณาเลือกวันที่");
+        if (totalH <= 0) return alert("เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น");
+        const othH = +(totalH - teachH).toFixed(2);
+        onSave({ ...row, totalHours: totalH, teachHours: teachH, otherHours: othH });
+      };
+
+      const inpStyle = { fontFamily: "Nunito,sans-serif", border: `2px solid ${P.border}`, borderRadius: 12, padding: "9px 12px", fontSize: 14, background: "#fff", color: P.text, width: "100%", outline: "none" };
+
+      return (
+        <>
+          {showDt && <DatePicker value={row.date} onClose={() => setShowDt(false)} onDone={v => { upd({ date: v }); setShowDt(false); }} />}
+          {showSt && <TimePicker value={row.startTime} label="เวลาเริ่มต้น" onClose={() => setShowSt(false)} onDone={v => { upd({ startTime: v }); setShowSt(false); }} />}
+          {showEt && <TimePicker value={row.endTime} label="เวลาสิ้นสุด" onClose={() => setShowEt(false)} onDone={v => { upd({ endTime: v }); setShowEt(false); }} />}
+          <div className="sd" style={{ padding: "18px", borderBottom: `2px solid ${P.border}`, background: bgColor || P.purpleS }}>
+            <div style={{ fontSize: 15, fontWeight: 900, color: P.purple, marginBottom: 16 }}>{title}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12, marginBottom: 14 }}>
+              <PickerBtn icon="📅" label="วันที่" display={row.date ? fmtDate(row.date) : ""} onClick={() => setShowDt(true)} />
+              <PickerBtn icon="🕐" label="เวลาเริ่มต้น" display={row.startTime} onClick={() => setShowSt(true)} />
+              <PickerBtn icon="🕔" label="เวลาสิ้นสุด" display={row.endTime} onClick={() => setShowEt(true)} />
+              {totalH > 0 && (<div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end" }}><div className="fl">⏱️ รวมทั้งหมด</div><div style={{ background: `linear-gradient(135deg,${P.pink},${P.purple})`, color: "#fff", borderRadius: 14, padding: "11px 10px", fontWeight: 900, fontSize: 22, textAlign: "center" }}>{totalH.toFixed(1)}<span style={{ fontSize: 12, fontWeight: 700 }}> ชม.</span></div></div>)}
+            </div>
+            {totalH > 0 && (<div style={{ marginBottom: 14 }}><SmartSplit totalHours={totalH} teachHours={teachH} onChange={v => upd({ teachHours: v })} /></div>)}
+            <div style={{ marginBottom: 14 }}><div className="fl">📝 หมายเหตุ (ไม่บังคับ)</div><input value={row.note || ""} onChange={e => upd({ note: e.target.value })} placeholder="เช่น สอนวิชา..." style={inpStyle} /></div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button className="btnP" onClick={handleSave}>💾 บันทึก</button><button className="btnG" onClick={onCancel}>ยกเลิก</button></div>
+          </div>
+        </>
+      );
+    }
+
+    // ==========================================
+    // ⚙️ อัปเดตส่วน Modal และ App ให้ทำงานร่วมกับ Firebase
+    // ==========================================
+
+    function ForgotPwModal({ onClose }) {
+      const [step, setStep] = useState(1), [fId, setFId] = useState(""), [fNm, setFNm] = useState(""), [fPw, setFPw] = useState(""), [fPw2, setFPw2] = useState(""), [fErr, setFErr] = useState(""), [ok, setOk] = useState(false);
+      const inpStyle = { fontFamily: "Nunito,sans-serif", border: `2px solid ${P.border}`, borderRadius: 12, padding: "9px 12px", fontSize: 14, background: P.pinkS, color: P.text, width: "100%", outline: "none" };
+
+      const verify = () => {
+        setFErr("");
+        db.ref('users/' + fId.trim()).once('value').then(snap => {
+          const u = snap.val();
+          if (!u) return setFErr("ไม่พบรหัสนักศึกษานี้ในระบบ");
+          if (u.name.trim().toLowerCase() !== fNm.trim().toLowerCase()) return setFErr("ชื่อ-นามสกุลไม่ตรงกับที่ลงทะเบียนไว้");
+          setStep(2);
+        });
+      };
+      const reset = () => {
+        setFErr("");
+        if (!fPw) return setFErr("กรุณากรอกรหัสผ่านใหม่");
+        if (fPw !== fPw2) return setFErr("รหัสผ่านทั้งสองช่องไม่ตรงกัน");
+        db.ref('users/' + fId.trim() + '/password').set(fPw).then(() => setOk(true));
+      };
+
+      return (
+        <div className="overlay fadeIn" onClick={onClose}>
+          <div className="bsheet sheet" onClick={e => e.stopPropagation()}>
+            <div className="handle" />
+            <div style={{ padding: "0 22px 24px" }}>
+              {!ok ? (
+                <>
+                  <div style={{ textAlign: "center", marginBottom: 18 }}><div style={{ fontSize: 38, marginBottom: 6 }}>🔓</div><div style={{ fontSize: 17, fontWeight: 900, color: P.text }}>ลืมรหัสผ่าน</div><div style={{ fontSize: 12, color: P.muted, marginTop: 4, fontWeight: 600 }}>{step === 1 ? "ยืนยันตัวตนด้วยรหัสนักศึกษา + ชื่อที่ลงทะเบียน" : "ตั้งรหัสผ่านใหม่"}</div></div>
+                  <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 18 }}>{[1, 2].map(s => (<div key={s} style={{ height: 6, width: s === step ? 32 : 16, borderRadius: 999, transition: "all .3s", background: s <= step ? P.pink : P.border }} />))}</div>
+                  {step === 1 && (<><div style={{ marginBottom: 12 }}><div className="fl">🎓 รหัสนักศึกษา</div><input style={inpStyle} placeholder="รหัสนักศึกษา" value={fId} onChange={e => setFId(e.target.value)} /></div><div style={{ marginBottom: 14 }}><div className="fl">👤 ชื่อ-นามสกุล (ตามที่ลงทะเบียน)</div><input style={inpStyle} placeholder="ชื่อของคุณ" value={fNm} onChange={e => setFNm(e.target.value)} onKeyDown={e => e.key === "Enter" && verify()} /></div></>)}
+                  {step === 2 && (<><div style={{ marginBottom: 12 }}><div className="fl">🔒 รหัสผ่านใหม่</div><PwField value={fPw} onChange={setFPw} placeholder="รหัสผ่านใหม่" /></div><div style={{ marginBottom: 14 }}><div className="fl">🔒 ยืนยันรหัสผ่านใหม่</div><PwField value={fPw2} onChange={setFPw2} placeholder="พิมพ์รหัสผ่านอีกครั้ง" onEnter={reset} extraStyle={{ borderColor: fPw2 && fPw2 !== fPw ? "#E57389" : fPw2 && fPw2 === fPw ? "#4ECDC4" : P.border }} />{fPw2 && <div style={{ fontSize: 12, fontWeight: 700, marginTop: 5, color: fPw2 === fPw ? "#1A9E96" : "#E57389" }}>{fPw2 === fPw ? "✅ รหัสผ่านตรงกัน" : "❌ รหัสผ่านไม่ตรงกัน"}</div>}</div></>)}
+                  {fErr && <div style={{ background: "#FFE8EE", border: "2px solid #FFCDD7", borderRadius: 12, padding: "10px 14px", fontSize: 13, color: "#E05370", marginBottom: 14, fontWeight: 700 }}>⚠️ {fErr}</div>}
+                  <div style={{ display: "flex", gap: 8 }}>{step === 2 && <button className="btnG" onClick={() => { setStep(1); setFErr(""); }}>← ย้อนกลับ</button>}<button className="btnP" onClick={step === 1 ? verify : reset} style={{ flex: 1, justifyContent: "center", padding: "12px", fontSize: 14 }}>{step === 1 ? "✅ ยืนยันตัวตน" : "🔑 ตั้งรหัสผ่านใหม่"}</button></div>
+                </>
+              ) : (
+                <div style={{ textAlign: "center", padding: "16px 0" }}><div style={{ fontSize: 54, marginBottom: 12 }}>🎉</div><div style={{ fontSize: 18, fontWeight: 900, color: P.text, marginBottom: 6 }}>เปลี่ยนรหัสผ่านสำเร็จ!</div><div style={{ fontSize: 13, color: P.muted, fontWeight: 600, marginBottom: 20 }}>เข้าสู่ระบบด้วยรหัสผ่านใหม่ได้เลย</div><button className="btnP" onClick={onClose} style={{ justifyContent: "center", padding: "12px 32px", fontSize: 14 }}>🚀 ไปหน้าเข้าสู่ระบบ</button></div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function ChangePwModal({ user, onClose, onChanged }) {
+      const [old, setOld] = useState(""), [nw1, setNw1] = useState(""), [nw2, setNw2] = useState(""), [err, setErr] = useState(""), [ok, setOk] = useState(false);
+      const save = () => {
+        setErr("");
+        if (!old || !nw1 || !nw2) return setErr("กรุณากรอกข้อมูลให้ครบ");
+        if (user.password !== old) return setErr("รหัสผ่านเก่าไม่ถูกต้อง");
+        if (nw1 !== nw2) return setErr("รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน");
+        if (nw1 === old) return setErr("รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสเก่า");
+        
+        db.ref('users/' + user.id + '/password').set(nw1).then(() => {
+          onChanged(nw1);
+          setOk(true);
+        });
+      };
+
+      return (
+        <div className="overlay fadeIn" onClick={onClose}>
+          <div className="bsheet sheet" onClick={e => e.stopPropagation()}>
+            <div className="handle" />
+            <div style={{ padding: "0 22px 24px" }}>
+              {!ok ? (
+                <>
+                  <div style={{ textAlign: "center", marginBottom: 18 }}><div style={{ fontSize: 36, marginBottom: 6 }}>🔑</div><div style={{ fontSize: 17, fontWeight: 900, color: P.text }}>เปลี่ยนรหัสผ่าน</div></div>
+                  <div style={{ marginBottom: 12 }}><div className="fl">🔒 รหัสผ่านเก่า</div><PwField value={old} onChange={setOld} placeholder="รหัสผ่านปัจจุบัน" /></div>
+                  <div style={{ marginBottom: 12 }}><div className="fl">🔒 รหัสผ่านใหม่</div><PwField value={nw1} onChange={setNw1} placeholder="รหัสผ่านใหม่" /></div>
+                  <div style={{ marginBottom: 14 }}><div className="fl">🔒 ยืนยันรหัสผ่านใหม่</div><PwField value={nw2} onChange={setNw2} placeholder="พิมพ์รหัสผ่านใหม่อีกครั้ง" onEnter={save} extraStyle={{ borderColor: nw2 && nw2 !== nw1 ? "#E57389" : nw2 && nw2 === nw1 ? "#4ECDC4" : P.border }} />{nw2 && <div style={{ fontSize: 12, fontWeight: 700, marginTop: 5, color: nw2 === nw1 ? "#1A9E96" : "#E57389" }}>{nw2 === nw1 ? "✅ รหัสผ่านตรงกัน" : "❌ รหัสผ่านไม่ตรงกัน"}</div>}</div>
+                  {err && <div style={{ background: "#FFE8EE", border: "2px solid #FFCDD7", borderRadius: 12, padding: "10px 14px", fontSize: 13, color: "#E05370", marginBottom: 14, fontWeight: 700 }}>⚠️ {err}</div>}
+                  <div style={{ display: "flex", gap: 8 }}><button className="btnP" onClick={save} style={{ flex: 1, justifyContent: "center", padding: "12px", fontSize: 14 }}>🔑 เปลี่ยนรหัสผ่าน</button><button className="btnG" onClick={onClose}>ยกเลิก</button></div>
+                </>
+              ) : (
+                <div style={{ textAlign: "center", padding: "20px 0" }}><div style={{ fontSize: 54, marginBottom: 12 }}>✅</div><div style={{ fontSize: 18, fontWeight: 900, color: P.text, marginBottom: 6 }}>เปลี่ยนรหัสผ่านสำเร็จ!</div><div style={{ fontSize: 13, color: P.muted, fontWeight: 600, marginBottom: 20 }}>รหัสผ่านใหม่พร้อมใช้งานแล้ว</div><button className="btnP" onClick={onClose} style={{ justifyContent: "center", padding: "12px 32px", fontSize: 14 }}>👍 ตกลง</button></div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const [view, setView] = useState("login"), [tab, setTab] = useState("login"), [user, setUser] = useState(null), [recs, setRecs] = useState([]);
+      const [reg, setReg] = useState({ id: "", name: "", password: "", confirm: "" }), [lg, setLg] = useState({ id: "", password: "" }), [regPw, setRegPw] = useState(""), [regPw2, setRegPw2] = useState("");
+      const [err, setErr] = useState(""), [adding, setAdding] = useState(false), [editId, setEditId] = useState(null), [filter, setFilter] = useState("all"), [forgot, setForgot] = useState(false), [changePw, setChangePw] = useState(false);
+
+      // ระบบ Real-time Sync ผ่าน Firebase
+      useEffect(() => {
+        const s = sessionStorage.getItem("edu_sess6");
+        if (s) {
+          try {
+            const u = JSON.parse(s);
+            setUser(u);
+            setView("dash");
+          } catch {}
+        }
+      }, []);
+
+      useEffect(() => {
+        if (user) {
+          const ref = db.ref(`records/${user.id}`);
+          ref.on('value', snap => {
+            const data = snap.val();
+            if (data) {
+              const arr = Object.values(data).sort((a, b) => a.date.localeCompare(b.date));
+              setRecs(arr);
+            } else {
+              setRecs([]);
+            }
+          });
+          return () => ref.off();
+        }
+      }, [user]);
+
+      const doLogin = () => {
+        setErr("");
+        db.ref('users/' + lg.id).once('value').then(snap => {
+          const u = snap.val();
+          if (!u) return setErr("ไม่พบรหัสนักศึกษานี้ในระบบ");
+          if (u.password !== lg.password) return setErr("รหัสผ่านไม่ถูกต้อง");
+          sessionStorage.setItem("edu_sess6", JSON.stringify(u));
+          setUser(u);
+          setView("dash");
+        }).catch(() => setErr("เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย"));
+      };
+
+      const doReg = () => {
+        setErr("");
+        if (!reg.id || !reg.name || !regPw) return setErr("กรุณากรอกข้อมูลให้ครบทุกช่อง");
+        if (regPw !== regPw2) return setErr("รหัสผ่านทั้งสองช่องไม่ตรงกัน");
+        const uId = reg.id.trim();
+        db.ref('users/' + uId).once('value').then(snap => {
+          if (snap.exists()) return setErr("รหัสนักศึกษานี้ถูกใช้แล้ว");
+          const u = { id: uId, name: reg.name.trim(), password: regPw };
+          db.ref('users/' + uId).set(u).then(() => {
+            sessionStorage.setItem("edu_sess6", JSON.stringify(u));
+            setUser(u);
+            setView("dash");
+          });
+        });
+      };
+
+      const logout = () => { sessionStorage.removeItem("edu_sess6"); setUser(null); setView("login"); setErr(""); };
+
+      const commit = (rData, isEdit, targetId) => {
+        const recId = isEdit ? targetId : Date.now();
+        const payload = { ...rData, id: recId };
+        db.ref(`records/${user.id}/${recId}`).set(payload).then(() => {
+          setAdding(false);
+          setEditId(null);
+        });
+      };
+
+      const delRec = id => db.ref(`records/${user.id}/${id}`).remove();
+
+      const teachH = recs.reduce((s, r) => s + (r.teachHours || 0), 0), othH = recs.reduce((s, r) => s + (r.otherHours || 0), 0), totH = teachH + othH, done = totH >= MIN_TOTAL && teachH >= MIN_EACH && othH >= MIN_EACH;
+      const filtered = filter === "all" ? recs : filter === "teaching" ? recs.filter(r => (r.teachHours || 0) > 0) : recs.filter(r => (r.otherHours || 0) > 0);
+      const inpBase = { fontFamily: "Nunito,sans-serif", border: `2px solid ${P.border}`, borderRadius: 12, padding: "9px 12px", fontSize: 14, background: P.pinkS, color: P.text, width: "100%", outline: "none" };
+
+      if (view === "login") return (
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem 1rem", position: "relative", overflow: "hidden", background: P.bg, fontFamily: "Nunito,sans-serif" }}>
+          <style>{css}</style>
+          <div className="blob" style={{ width: 340, height: 340, background: P.pinkL, top: -100, left: -100 }} /><div className="blob" style={{ width: 260, height: 260, background: P.tealL, bottom: -60, right: -60 }} /><div className="blob" style={{ width: 180, height: 180, background: P.yellowL, top: "35%", right: "8%" }} />
+          <div className="card pop" style={{ width: "100%", maxWidth: 420, position: "relative", zIndex: 1, border: `2px solid ${P.pinkL}`, padding: 28 }}>
+            <div style={{ textAlign: "center", marginBottom: 24 }}><div style={{ fontSize: 54, marginBottom: 8 }}>📚✨</div><h2 style={{ fontSize: 22, fontWeight: 900, background: `linear-gradient(135deg,${P.pink},${P.purple})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>บันทึกชั่วโมงฝึกสอน</h2><p style={{ fontSize: 13, color: P.muted, marginTop: 4, fontWeight: 600 }}>EDU 01 — ระบบรายงานผลการปฏิบัติงาน</p></div>
+            <div style={{ display: "flex", marginBottom: 20, background: P.pinkS, borderRadius: 50, padding: 4 }}>{[["login", "🔑 เข้าสู่ระบบ"], ["register", "🌸 ลงทะเบียน"]].map(([v, label]) => (<button key={v} onClick={() => { setTab(v); setErr(""); }} style={{ flex: 1, padding: "9px 0", fontSize: 13, border: "none", cursor: "pointer", borderRadius: 50, fontWeight: 800, fontFamily: "Nunito,sans-serif", transition: "all .2s", background: tab === v ? "#fff" : "transparent", color: tab === v ? P.pink : P.muted, boxShadow: tab === v ? `0 2px 12px ${P.pinkL}` : "none" }}>{label}</button>))}</div>
+            {tab === "register" && (<div style={{ marginBottom: 14 }}><div className="fl">👤 ชื่อ-นามสกุล</div><input style={inpBase} placeholder="ชื่อของคุณ" value={reg.name} onChange={e => setReg({ ...reg, name: e.target.value })} /></div>)}
+            <div style={{ marginBottom: 14 }}><div className="fl">🎓 รหัสนักศึกษา</div><input style={inpBase} placeholder="รหัสนักศึกษา" value={tab === "login" ? lg.id : reg.id} onChange={e => tab === "login" ? setLg({ ...lg, id: e.target.value }) : setReg({ ...reg, id: e.target.value })} /></div>
+            <div style={{ marginBottom: tab === "register" ? 14 : 16 }}><div className="fl">🔒 รหัสผ่าน</div>{tab === "login" ? <PwField value={lg.password} onChange={v => setLg({ ...lg, password: v })} placeholder="รหัสผ่าน" onEnter={doLogin} /> : <PwField value={regPw} onChange={setRegPw} placeholder="รหัสผ่าน" />}</div>
+            {tab === "register" && (<div style={{ marginBottom: 16 }}><div className="fl">🔒 ยืนยันรหัสผ่านอีกครั้ง</div><PwField value={regPw2} onChange={setRegPw2} placeholder="พิมพ์รหัสผ่านอีกครั้ง" onEnter={doReg} extraStyle={{ borderColor: regPw2 && regPw2 !== regPw ? "#E57389" : regPw2 && regPw2 === regPw ? "#4ECDC4" : P.border }} />{regPw2 && <div style={{ fontSize: 12, fontWeight: 700, marginTop: 5, color: regPw2 === regPw ? "#1A9E96" : "#E57389" }}>{regPw2 === regPw ? "✅ รหัสผ่านตรงกัน" : "❌ รหัสผ่านไม่ตรงกัน"}</div>}</div>)}
+            {err && <div style={{ background: "#FFE8EE", border: "2px solid #FFCDD7", borderRadius: 12, padding: "10px 14px", fontSize: 13, color: "#E05370", marginBottom: 14, fontWeight: 700 }}>⚠️ {err}</div>}
+            <button className="btnP" onClick={tab === "login" ? doLogin : doReg} style={{ width: "100%", justifyContent: "center", padding: "13px", fontSize: 15 }}>{tab === "login" ? "🚀 เข้าสู่ระบบ" : "🌟 ลงทะเบียนเลย"}</button>
+            {tab === "login" && (<button onClick={() => setForgot(true)} style={{ display: "block", width: "100%", textAlign: "center", marginTop: 12, background: "none", border: "none", fontSize: 13, color: P.purple, cursor: "pointer", fontWeight: 800, fontFamily: "Nunito,sans-serif", textDecoration: "underline" }}>🔓 ลืมรหัสผ่าน?</button>)}
+            <p style={{ textAlign: "center", fontSize: 11, color: P.muted, marginTop: 10, fontWeight: 600 }}>เชื่อมต่อข้อมูลผ่าน Cloud Sync ☁️</p>
+          </div>
+          {forgot && <ForgotPwModal onClose={() => setForgot(false)} />}
+        </div>
+      );
+
+      return (
+        <div className="app">
+          <style>{css}</style>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}><div style={{ fontSize: 34 }}>📚</div><div><h2 style={{ fontSize: 19, fontWeight: 900 }}>รายงานผลการปฏิบัติงาน</h2><p style={{ fontSize: 12, color: P.muted, fontWeight: 700 }}>👩‍🎓 {user?.name} · {user?.id}</p></div></div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>{done && <span style={{ fontSize: 13, background: P.tealS, color: "#1A9E96", border: `2px solid ${P.tealL}`, borderRadius: 50, padding: "6px 16px", fontWeight: 900 }}>🎉 ครบตามเกณฑ์!</span>}<button className="btnG" onClick={() => setChangePw(true)} style={{ fontSize: 12, padding: "7px 14px" }}>🔑 เปลี่ยนรหัสผ่าน</button><button className="btnG" onClick={logout}>ออกจากระบบ 👋</button></div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 20 }}>
+            <StatCard emoji="⏰" label="ชั่วโมงทั้งหมด" val={totH} target={180} color={P.pink} colorL={P.pinkL} /><StatCard emoji="📚" label="การปฏิบัติการสอน" val={teachH} target={90} color={P.teal} colorL={P.tealL} /><StatCard emoji="📋" label="งานอื่นๆ" val={othH} target={90} color={P.purple} colorL={P.purpleL} />
+            <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 4 }}><div style={{ fontSize: 32 }}>🗒️</div><div style={{ fontSize: 11, color: P.muted, fontWeight: 700 }}>จำนวนครั้ง</div><div style={{ fontSize: 30, fontWeight: 900 }}>{recs.length}</div><div style={{ fontSize: 12, color: P.muted, fontWeight: 600 }}>ครั้ง</div></div>
+          </div>
+
+          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+            <div style={{ padding: "14px 18px", borderBottom: `2px solid ${P.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, background: P.pinkS, borderRadius: "18px 18px 0 0" }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{[["all", "🗂️ ทั้งหมด"], ["teaching", "📚 สอน"], ["other", "📋 อื่นๆ"]].map(([v, label]) => (<button key={v} onClick={() => setFilter(v)} style={{ fontSize: 12, padding: "7px 16px", borderRadius: 50, border: "2px solid", cursor: "pointer", fontFamily: "Nunito,sans-serif", fontWeight: 800, transition: "all .15s", borderColor: filter === v ? P.pink : P.border, background: filter === v ? P.pink : "#fff", color: filter === v ? "#fff" : P.muted }}>{label} ({v === "all" ? recs.length : v === "teaching" ? recs.filter(r => (r.teachHours || 0) > 0).length : recs.filter(r => (r.otherHours || 0) > 0).length})</button>))}</div>
+              <button className="btnP" onClick={() => { setAdding(true); setEditId(null); }}>✨ เพิ่มรายการ</button>
+            </div>
+
+            {adding && <RecordForm initial={EMPTY_ROW} title="🌟 เพิ่มรายการใหม่" bgColor={P.purpleS} onSave={d => commit(d, false, null)} onCancel={() => setAdding(false)} />}
+            {editId !== null && (() => { const rec = recs.find(r => r.id === editId); return rec ? <RecordForm key={editId} initial={{ ...rec }} title="✏️ แก้ไขรายการ" bgColor="#FFFBF0" onSave={d => commit(d, true, editId)} onCancel={() => setEditId(null)} /> : null; })()}
+
+            {filtered.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "3rem 1rem" }}><div style={{ fontSize: 60, marginBottom: 12 }}>🌸</div><p style={{ color: P.muted, fontWeight: 800, fontSize: 15 }}>ยังไม่มีรายการ</p><p style={{ color: P.muted, fontSize: 13, marginTop: 4 }}>กด "✨ เพิ่มรายการ" เพื่อเริ่มบันทึก</p></div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 540 }}>
+                  <thead><tr style={{ background: P.pinkS }}>{["#", "วันที่", "เวลา", "รวม", "📚 สอน", "📋 อื่นๆ", "หมายเหตุ", ""].map(h => (<th key={h} style={{ padding: "10px 10px", textAlign: "left", fontSize: 11, fontWeight: 800, color: P.muted, borderBottom: `2px solid ${P.border}`, whiteSpace: "nowrap" }}>{h}</th>))}</tr></thead>
+                  <tbody>{filtered.map((rec, i) => (<tr key={rec.id} className="row"><td style={{ padding: "11px 10px", fontSize: 12, color: P.muted, fontWeight: 800 }}>{i + 1}</td><td style={{ padding: "11px 10px", fontSize: 13, fontWeight: 800, whiteSpace: "nowrap" }}>{fmtDate(rec.date)}</td><td style={{ padding: "11px 10px", fontSize: 12, color: P.muted, whiteSpace: "nowrap", fontWeight: 700 }}>{rec.startTime} – {rec.endTime}</td><td style={{ padding: "11px 10px" }}><span style={{ background: `linear-gradient(135deg,${P.pink},${P.purple})`, color: "#fff", borderRadius: 50, padding: "4px 12px", fontSize: 13, fontWeight: 900, whiteSpace: "nowrap" }}>{(rec.totalHours || 0).toFixed(1)} ชม.</span></td><td style={{ padding: "11px 10px" }}><span className="tagT">{(rec.teachHours || 0).toFixed(1)} ชม.</span></td><td style={{ padding: "11px 10px" }}><span className="tagO">{(rec.otherHours || 0).toFixed(1)} ชม.</span></td><td style={{ padding: "11px 10px", fontSize: 12, color: P.muted, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rec.note || "—"}</td><td style={{ padding: "11px 10px" }}><div style={{ display: "flex", gap: 5 }}><button onClick={() => { setEditId(rec.id); setAdding(false); }} style={{ background: P.purpleS, border: `2px solid ${P.purpleL}`, borderRadius: 50, padding: "4px 10px", fontSize: 12, color: P.purple, cursor: "pointer", fontWeight: 800, fontFamily: "Nunito,sans-serif" }}>✏️</button><button onClick={() => delRec(rec.id)} style={{ background: "#FFF0F3", border: "2px solid #FFCDD7", borderRadius: 50, padding: "4px 10px", fontSize: 12, color: "#E57389", cursor: "pointer", fontWeight: 800, fontFamily: "Nunito,sans-serif" }}>🗑️</button></div></td></tr>))}</tbody>
+                  <tfoot><tr style={{ background: P.pinkS }}><td colSpan={3} style={{ padding: "12px 10px", fontSize: 12, fontWeight: 800, color: P.muted, borderTop: `2px solid ${P.border}` }}>รวม ({filtered.length} รายการ)</td><td style={{ padding: "12px 10px", borderTop: `2px solid ${P.border}` }}><span style={{ background: `linear-gradient(135deg,${P.pink},${P.purple})`, color: "#fff", borderRadius: 50, padding: "4px 12px", fontSize: 13, fontWeight: 900 }}>{filtered.reduce((s, r) => s + (r.totalHours || 0), 0).toFixed(1)} ชม.</span></td><td style={{ padding: "12px 10px", borderTop: `2px solid ${P.border}` }}><span className="tagT">{filtered.reduce((s, r) => s + (r.teachHours || 0), 0).toFixed(1)} ชม.</span></td><td style={{ padding: "12px 10px", borderTop: `2px solid ${P.border}` }}><span className="tagO">{filtered.reduce((s, r) => s + (r.otherHours || 0), 0).toFixed(1)} ชม.</span></td><td colSpan={2} style={{ borderTop: `2px solid ${P.border}` }} /></tr></tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+          <p style={{ textAlign: "center", fontSize: 12, color: P.muted, marginTop: 16, fontWeight: 600 }}>🟢 เชื่อมต่อกับระบบ Cloud แล้ว · อัปเดตข้อมูลแบบเรียลไทม์</p>
+
+          {changePw && (
+            <ChangePwModal user={user} onClose={() => setChangePw(false)} onChanged={newPw => { const updated = { ...user, password: newPw }; setUser(updated); sessionStorage.setItem("edu_sess6", JSON.stringify(updated)); }} />
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
