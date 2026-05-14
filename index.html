@@ -269,23 +269,55 @@
 
     function SmartSplit({ totalHours, teachHours, onChange }) {
       const othH = +(totalHours - teachHours).toFixed(2), pct = totalHours > 0 ? (teachHours / totalHours) * 100 : 0, clamp = v => Math.min(totalHours, Math.max(0, +v.toFixed(2)));
+
+      // ฟังก์ชันจัดการเมื่อพิมพ์ช่อง "สอน"
+      const onTeachInput = (e) => {
+        const val = e.target.value;
+        if (val === '') onChange(0);
+        else onChange(clamp(parseFloat(val)));
+      };
+
+      // ฟังก์ชันจัดการเมื่อพิมพ์ช่อง "อื่นๆ" (ให้หักลบจากเวลารวมอัตโนมัติ)
+      const onOtherInput = (e) => {
+        const val = e.target.value;
+        if (val === '') onChange(totalHours);
+        else onChange(clamp(totalHours - parseFloat(val)));
+      };
+
       return (
         <div style={{ background: P.purpleS, border: `2px dashed ${P.purpleL}`, borderRadius: 18, padding: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: P.purple, marginBottom: 12 }}>🗂️ แบ่งประเภทงาน</div>
-          <div style={{ borderRadius: 12, overflow: "hidden", height: 28, display: "flex", marginBottom: 12, border: `2px solid ${P.border}` }}>
-            <div style={{ width: `${pct}%`, background: `linear-gradient(90deg,${P.teal},${P.tealL})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, color: "#0A6E68", overflow: "hidden", whiteSpace: "nowrap", padding: "0 6px", minWidth: pct > 5 ? "auto" : 0, transition: "width .3s" }}>{pct > 15 ? `📚 ${teachHours.toFixed(1)}ชม.` : ""}</div>
-            <div style={{ flex: 1, background: `linear-gradient(90deg,${P.yellowL},${P.yellow}55)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, color: "#8A6400", overflow: "hidden", whiteSpace: "nowrap", padding: "0 6px" }}>{(100 - pct) > 15 ? `📋 ${othH.toFixed(1)}ชม.` : ""}</div>
+          
+          {/* แถบ Progress Bar ด้านบน */}
+          <div style={{ borderRadius: 12, overflow: "hidden", height: 28, display: "flex", marginBottom: 16, border: `2px solid ${P.border}` }}>
+            <div style={{ width: `${pct}%`, background: `linear-gradient(90deg,${P.teal},${P.tealL})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, color: "#0A6E68", overflow: "hidden", whiteSpace: "nowrap", padding: "0 6px", minWidth: pct > 5 ? "auto" : 0, transition: "width .3s" }}>{pct > 15 ? `📚 ${teachHours}ชม.` : ""}</div>
+            <div style={{ flex: 1, background: `linear-gradient(90deg,${P.yellowL},${P.yellow}55)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, color: "#8A6400", overflow: "hidden", whiteSpace: "nowrap", padding: "0 6px" }}>{(100 - pct) > 15 ? `📋 ${othH}ชม.` : ""}</div>
           </div>
-          <div className="fl">📚 การปฏิบัติการสอน</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <button onClick={() => onChange(clamp(+(teachHours - 0.5).toFixed(2)))} style={{ width: 40, height: 40, borderRadius: 12, border: `2px solid ${P.tealL}`, background: P.tealL, cursor: "pointer", fontSize: 22, fontWeight: 900, color: "#0A6E68", fontFamily: "Nunito,sans-serif", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
-            <div style={{ flex: 1, background: "#fff", border: `2px solid ${P.tealL}`, borderRadius: 14, padding: 10, textAlign: "center", fontWeight: 900, fontSize: 20, color: "#0A6E68", whiteSpace: "nowrap" }}>{teachHours.toFixed(1)}<span style={{ fontSize: 12, fontWeight: 700, color: P.muted }}> ชม.</span></div>
-            <button onClick={() => onChange(clamp(+(teachHours + 0.5).toFixed(2)))} style={{ width: 40, height: 40, borderRadius: 12, border: `2px solid ${P.tealL}`, background: P.tealL, cursor: "pointer", fontSize: 22, fontWeight: 900, color: "#0A6E68", fontFamily: "Nunito,sans-serif", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+          
+          {/* แยกเป็น 2 ช่อง ซ้าย-ขวา */}
+          <div style={{ display: "flex", gap: 12 }}>
+            
+            {/* ช่องซ้าย: ปฏิบัติการสอน */}
+            <div style={{ flex: 1 }}>
+              <div className="fl" style={{ marginBottom: 8, color: "#0A6E68" }}>📚 ปฏิบัติการสอน</div>
+              <div style={{ position: "relative" }}>
+                 <input type="number" min="0" max={totalHours} step="any" value={teachHours === 0 ? "" : teachHours} onChange={onTeachInput} style={{ width: "100%", background: "#fff", border: `2px solid ${P.tealL}`, borderRadius: 14, padding: "10px 30px 10px 10px", textAlign: "center", fontWeight: 900, fontSize: 18, color: "#0A6E68", outline: "none", fontFamily: "Nunito,sans-serif" }} />
+                 <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 12, fontWeight: 700, color: P.muted, pointerEvents: "none" }}>ชม.</span>
+              </div>
+            </div>
+
+            {/* ช่องขวา: งานอื่นๆ */}
+            <div style={{ flex: 1 }}>
+              <div className="fl" style={{ marginBottom: 8, color: "#8A6400" }}>📋 งานอื่นๆ</div>
+              <div style={{ position: "relative" }}>
+                 <input type="number" min="0" max={totalHours} step="any" value={othH === 0 ? "" : othH} onChange={onOtherInput} style={{ width: "100%", background: "#fff", border: `2px solid ${P.yellowL}`, borderRadius: 14, padding: "10px 30px 10px 10px", textAlign: "center", fontWeight: 900, fontSize: 18, color: "#8A6400", outline: "none", fontFamily: "Nunito,sans-serif" }} />
+                 <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 12, fontWeight: 700, color: P.muted, pointerEvents: "none" }}>ชม.</span>
+              </div>
+            </div>
+            
           </div>
-          <input type="range" className="tslider" min={0} max={totalHours} step={0.5} value={teachHours} onChange={e => onChange(clamp(parseFloat(e.target.value)))} style={{ background: `linear-gradient(90deg,${P.teal} ${pct}%,${P.pinkL} ${pct}%)` }} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: P.muted, fontWeight: 700, marginTop: 2 }}><span>0</span><span>{totalHours.toFixed(1)} ชม.</span></div>
-          <div style={{ background: "#fff", border: `2px solid ${P.yellowL}`, borderRadius: 14, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}><span style={{ fontSize: 13, fontWeight: 800, color: "#8A6400" }}>📋 งานอื่นๆ (คำนวณอัตโนมัติ)</span><span style={{ fontSize: 18, fontWeight: 900, color: "#8A6400", whiteSpace: "nowrap" }}>{othH.toFixed(1)} <span style={{ fontSize: 12 }}>ชม.</span></span></div>
-          {othH < 0 && <div style={{ fontSize: 12, color: "#E05370", fontWeight: 800, marginTop: 6 }}>⚠️ ชั่วโมงสอนเกินกว่าเวลารวม!</div>}
+          
+          {othH < 0 && <div style={{ fontSize: 12, color: "#E05370", fontWeight: 800, marginTop: 10 }}>⚠️ ชั่วโมงสอนเกินกว่าเวลารวม!</div>}
         </div>
       );
     }
